@@ -1,3 +1,13 @@
+/*-------------------------------------------------------------------------
+*
+* kmeans.h
+*    Generic k-means implementation
+*
+* Copyright (c) 2016, Paul Ramsey <pramsey@cleverelephant.ca>
+*
+*------------------------------------------------------------------------*/
+
+
 #include <stdlib.h>
 
 #define KMEANS_NULL_CLUSTER -1

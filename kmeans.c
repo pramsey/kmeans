@@ -1,3 +1,11 @@
+/*-------------------------------------------------------------------------
+*
+* kmeans.c
+*    Generic k-means implementation
+*
+* Copyright (c) 2016, Paul Ramsey <pramsey@cleverelephant.ca>
+*
+*------------------------------------------------------------------------*/
 
 #include <assert.h>
 #include <float.h>
