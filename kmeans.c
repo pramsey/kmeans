@@ -111,6 +111,15 @@ kmeans(kmeans_config *config)
 	double	target, new_target;
 	int iterations = 0;
 
+	assert(config);
+	assert(config->objs);
+	assert(config->num_objs);
+	assert(config->distance_method);
+	assert(config->centroid_method);
+	assert(config->centers);
+	assert(config->k);
+	assert(config->clusters);
+	
 	/* Zero out cluster numbers, just in case user forgets */
 	memset(config->clusters, 0, sizeof(int)*config->num_objs);
 	
@@ -136,10 +145,9 @@ kmeans(kmeans_config *config)
 		if (fabs(target - new_target) < DBL_EPSILON)
 			return KMEANS_OK;
 		
-		if (iterations > config->max_iterations)
+		if (iterations++ > config->max_iterations)
 			return KMEANS_EXCEEDED_MAX_ITERATIONS;
 		
-		iterations++;
 		target = new_target;
 	}
 
