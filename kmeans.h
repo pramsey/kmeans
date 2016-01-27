@@ -66,8 +66,8 @@ typedef enum {
 */
 typedef double (*kmeans_distance_method) (const Pointer a, const Pointer b);
 
-/* 
-* Prototype for the centroid calculating function 
+/*
+* Prototype for the centroid calculating function
 * @param objs the list of all objects in the calculation
 * @param clusters the list of cluster numbers for each object
 * @param num_objs the number of objects/cluster numbers in the previous arrays

@@ -10,4 +10,12 @@ This code will probably only get used in [PostGIS](http://postgis.net), but in c
 
 Best to read the [kmeans.h](kmeans.h) file and the two example programs for usage.
 
-## To Do
+Everything is very easy except figuring out the initial set of centers to feed the algorithm. Some rules of thumb:
+
+* No matter what, use actual values from your set, not averages or other medial values. If you use an actual value, you're guaranteed that in the first assignment of clusters, at least one data point will match your cluster. If you don't, you can end up with orphaned clusters.
+* Just picking K random entries from your input data is probably not the worst thing you could do.
+* Other approaches include partitioning the space and calculating seeds evenly in the space, then choosing the closest real data points to each of the calculated seeds. This results in the nicest outputs I have seen so far.
+
+## Multi-threading
+
+The calculations are embarrasingly parallel, so there is an optional multi-threading switch you can turn on. You have to select your maximum amount of parallelism at compile time, I haven't put in any automatic detection, in aid of keeping things simple. Because the threading uses `pthread.h` it's not portable to Windows without some kind of a POSIX environment.
