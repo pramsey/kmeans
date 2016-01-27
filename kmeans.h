@@ -61,10 +61,19 @@ typedef enum {
 	KMEANS_ERROR
 } kmeans_result;
 
-/* Prototype for the distance calculating function */
+/*
+* Prototype for the distance calculating function
+*/
 typedef double (*kmeans_distance_method) (const Pointer a, const Pointer b);
 
-/* Prototype for the centroid calculating function */
+/* 
+* Prototype for the centroid calculating function 
+* @param objs the list of all objects in the calculation
+* @param clusters the list of cluster numbers for each object
+* @param num_objs the number of objects/cluster numbers in the previous arrays
+* @param cluster the cluster number we are actually generating a centroid for here
+* @param centroid the object to write the centroid result into (already allocated)
+*/
 typedef void (*kmeans_centroid_method) (const Pointer * objs, const int * clusters, size_t num_objs, int cluster, Pointer centroid);
 
 typedef struct kmeans_config

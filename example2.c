@@ -26,6 +26,7 @@ static double pt_distance(const Pointer a, const Pointer b)
 static void pt_centroid(const Pointer * objs, const int * clusters, size_t num_objs, int cluster, Pointer centroid)
 {
 	int i;
+	int num_cluster = 0;
 	point sum;
 	point **pts = (point**)objs;
 	point *center = (point*)centroid;
@@ -41,10 +42,14 @@ static void pt_centroid(const Pointer * objs, const int * clusters, size_t num_o
 
 		sum.x += pts[i]->x;
 		sum.y += pts[i]->y;
+		num_cluster++;
 	}
-	sum.x /= num_objs;
-	sum.y /= num_objs;
-	*center = sum;
+	if (num_cluster)
+	{
+		sum.x /= num_cluster;
+		sum.y /= num_cluster;
+		*center = sum;
+	}
 	return;
 }
 

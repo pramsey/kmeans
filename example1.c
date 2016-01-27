@@ -14,6 +14,7 @@ static double d_distance(const Pointer a, const Pointer b)
 static void d_centroid(const Pointer * objs, const int * clusters, size_t num_objs, int cluster, Pointer centroid)
 {
 	int i;
+	int num_cluster = 0;
 	double sum = 0;
 	double **doubles = (double**)objs;
 	double *dcentroid = (double*)centroid;
@@ -27,9 +28,13 @@ static void d_centroid(const Pointer * objs, const int * clusters, size_t num_ob
 			continue;
 
 		sum += *(doubles[i]);
+		num_cluster++;
 	}
-	sum /= num_objs;
-	*dcentroid = sum;
+	if (num_cluster)
+	{
+		sum /= num_cluster;
+		*dcentroid = sum;
+	}
 	return;
 }
 
