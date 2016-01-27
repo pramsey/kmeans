@@ -11,29 +11,34 @@
 #include <float.h>
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "kmeans.h"
+
+#ifdef KMEANS_THREADED
+#include <pthread.h>
+#endif
 
 static void
 update_r(kmeans_config *config)
 {
 	int i;
-	
+
 	for (i = 0; i < config->num_objs; i++)
 	{
 		double distance, curr_distance;
 		int cluster, curr_cluster;
 		Pointer obj;
-		
+
 		assert(config->objs != NULL);
 		assert(config->num_objs > 0);
 		assert(config->centers);
 		assert(config->clusters);
-		
+
 		obj = config->objs[i];
-		
-		/* 
+
+		/*
 		* Don't try to cluster NULL objects, just add them
 		* to the "unclusterable cluster"
 		*/
@@ -42,11 +47,11 @@ update_r(kmeans_config *config)
 			config->clusters[i] = KMEANS_NULL_CLUSTER;
 			continue;
 		}
-		
+
 		/* Initialize with distance to first cluster */
 		curr_distance = (config->distance_method)(obj, config->centers[0]);
 		curr_cluster = 0;
-		
+
 		/* Check all other cluster centers and find the nearest */
 		for (cluster = 1; cluster < config->k; cluster++)
 		{
@@ -57,11 +62,93 @@ update_r(kmeans_config *config)
 				curr_cluster = cluster;
 			}
 		}
-		
+
 		/* Store the nearest cluster this object is in */
 		config->clusters[i] = curr_cluster;
 	}
 }
+
+#ifdef KMEANS_THREADED
+
+static void * update_r_threaded_main(void *args)
+{
+	kmeans_config *config = (kmeans_config*)args;
+	update_r(config);
+	pthread_exit(args);
+}
+
+static void update_r_threaded(kmeans_config *config)
+{
+	/* Computational complexity is function of objs/clusters */
+	/* We only spin up threading infra if we need more than one core */
+	/* running. We keep the threshold high so the overhead of */
+	/* thread management is small compared to thread compute time */
+	int num_threads = config->num_objs * config->k / KMEANS_THR_THRESHOLD;
+
+	/* Can't run more threads than the maximum */
+	num_threads = (num_threads > KMEANS_THR_MAX ? KMEANS_THR_MAX : num_threads);
+
+	/* If the problem size is small, don't bother w/ threading */
+	if (num_threads < 1)
+	{
+		update_r(config);
+	}
+	else
+	{
+		pthread_t thread[KMEANS_THR_MAX];
+	    pthread_attr_t thread_attr;
+		kmeans_config thread_config[KMEANS_THR_MAX];
+		int obs_per_thread = config->num_objs / num_threads;
+	    int i, rc;
+
+		for (i = 0; i < num_threads; i++)
+		{
+			/*
+			* Each thread gets a copy of the config, but with the list pointers
+			* offest to the start of the batch the thread is responsible for, and the
+			* object count number adjusted similarly.
+			*/
+			memcpy(&(thread_config[i]), config, sizeof(kmeans_config));
+			thread_config[i].objs += i*obs_per_thread;
+			thread_config[i].clusters += i*obs_per_thread;
+			thread_config[i].num_objs = obs_per_thread;
+			if (i == num_threads-1)
+			{
+				thread_config[i].num_objs += config->num_objs - num_threads*obs_per_thread;
+			}
+
+		    /* Initialize and set thread detached attribute */
+		    pthread_attr_init(&thread_attr);
+		    pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
+
+			/* Now we just run the thread, on its subset of the data */
+			rc = pthread_create(&thread[i], &thread_attr, update_r_threaded_main, (void *) &thread_config[i]);
+			if (rc)
+			{
+				printf("ERROR: return code from pthread_create() is %d\n", rc);
+				exit(-1);
+			}
+		}
+
+	    /* Free attribute and wait for the other threads */
+	    pthread_attr_destroy(&thread_attr);
+
+		/* Wait for all calculations to complete */
+		for (i = 0; i < num_threads; i++)
+		{
+		    void *status;
+			rc = pthread_join(thread[i], &status);
+			if (rc)
+			{
+				printf("ERROR: return code from pthread_join() is %d\n", rc);
+				exit(-1);
+			}
+		}
+	}
+
+
+}
+#endif /* KMEANS_THREADED */
 
 static double
 J(kmeans_config *config)
@@ -80,29 +167,13 @@ J(kmeans_config *config)
 static void
 update_means(kmeans_config *config)
 {
-	/* Allocate enough space for all objects, just in case */
-	Pointer * objs = calloc(config->num_objs, sizeof(Pointer));
 	int i;
-	int cluster;
-	
-	for (cluster = 0; cluster < config->k; cluster++) 
+
+	for (i = 0; i < config->k; i++)
 	{
-		/* Set up a clean list to hold the cluster object references */
-		int num_objs = 0;
-		memset(objs, 0, sizeof(Pointer) * config->num_objs);
-		
-		/* Find all the objects currently in this cluster */
-		for (i = 0; i < config->num_objs; i++)
-		{
-			if (config->clusters[i] == cluster)
-				objs[num_objs++] = config->objs[i];
-		}
-		
 		/* Update the centroid for this cluster */
-		(config->centroid_method)(objs, num_objs, config->centers[cluster]);
+		(config->centroid_method)(config->objs, config->clusters, config->num_objs, i, config->centers[i]);
 	}
-	
-	free(objs);
 }
 
 kmeans_result
@@ -119,14 +190,14 @@ kmeans(kmeans_config *config)
 	assert(config->centers);
 	assert(config->k);
 	assert(config->clusters);
-	
+
 	/* Zero out cluster numbers, just in case user forgets */
 	memset(config->clusters, 0, sizeof(int)*config->num_objs);
-	
+
 	/* Set default max iterations if necessary */
 	if (!config->max_iterations)
 		config->max_iterations = KMEANS_MAX_ITERATIONS;
-	
+
 	/*
 	 * initialize purpose value. At this time, r doesn't mean anything
 	 * but it's ok; just fill target by some value.
@@ -134,20 +205,24 @@ kmeans(kmeans_config *config)
 	target = J(config);
 	while (1)
 	{
+
+#ifdef KMEANS_THREADED
+		update_r_threaded(config);
+#else
 		update_r(config);
+#endif
 		update_means(config);
 		new_target = J(config);
-		// kmeans_debug(mean, dim, k);
 		/*
 		 * if all the classification stay, diff must be 0.0,
 		 * which means we can go out!
 		 */
 		if (fabs(target - new_target) < DBL_EPSILON)
 			return KMEANS_OK;
-		
+
 		if (iterations++ > config->max_iterations)
 			return KMEANS_EXCEEDED_MAX_ITERATIONS;
-		
+
 		target = new_target;
 	}
 

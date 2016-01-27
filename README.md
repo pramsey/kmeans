@@ -11,5 +11,3 @@ This code will probably only get used in [PostGIS](http://postgis.net), but in c
 Best to read the [kmeans.h](kmeans.h) file and the two example programs for usage.
 
 ## To Do
-
-* Maybe multi-threading the `update_r()` routine when the combined number of objects / number of clusters gets large enough would be wise.

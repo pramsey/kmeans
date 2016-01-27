@@ -4,24 +4,28 @@
 #include "kmeans.h"
 
 
-static double d_distance(const Pointer a, const Pointer b) 
+static double d_distance(const Pointer a, const Pointer b)
 {
 	double da = *((double*)a);
 	double db = *((double*)b);
 	return fabs(da - db);
 }
 
-static void d_centroid(const Pointer * objs, size_t num_objs, Pointer centroid)
+static void d_centroid(const Pointer * objs, const int * clusters, size_t num_objs, int cluster, Pointer centroid)
 {
 	int i;
 	double sum = 0;
 	double **doubles = (double**)objs;
 	double *dcentroid = (double*)centroid;
-	
+
 	if (num_objs <= 0) return;
-	
+
 	for (i = 0; i < num_objs; i++)
 	{
+		/* Only process objects of interest */
+		if (clusters[i] != cluster)
+			continue;
+
 		sum += *(doubles[i]);
 	}
 	sum /= num_objs;
@@ -37,7 +41,7 @@ main(int nargs, char **args)
 	kmeans_config config;
 	kmeans_result result;
 	int i;
-	
+
 	config.num_objs = 11;
 	config.k = 2;
 	config.max_iterations = 100;
@@ -60,11 +64,11 @@ main(int nargs, char **args)
 	for (i = 0; i < config.k; i++)
 	{
 		config.centers[i] = &(c[i]);
-	}	
+	}
 
 	/* run k-means */
 	result = kmeans(&config);
-	
+
 	/* print result */
 	for (i = 0; i < config.num_objs; i++)
 	{
@@ -73,11 +77,11 @@ main(int nargs, char **args)
 		else
 			printf("NN [%d]\n", config.clusters[i]);
 	}
-	
+
 	free(config.objs);
 	free(config.clusters);
 	free(config.centers);
-	
+
 	return 0;
 }
 
