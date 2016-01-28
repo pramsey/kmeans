@@ -48,7 +48,7 @@
 * move to multi-threading.
 */
 #ifdef KMEANS_THREADED
-#define KMEANS_THR_MAX 4
+#define KMEANS_THR_MAX 2
 #define KMEANS_THR_THRESHOLD 250000
 #endif
 
@@ -109,6 +109,9 @@ typedef struct kmeans_config
 	/* Maximum number of times to iterate the algorithm, or 0 for */
 	/* library default */
 	unsigned int max_iterations;
+
+	/* Iteration counter */
+	unsigned int total_iterations;
 
 	/* Array to fill in with cluster numbers. User allocates and frees. */
 	int * clusters;

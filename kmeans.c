@@ -68,6 +68,32 @@ update_r(kmeans_config *config)
 	}
 }
 
+static double
+J(kmeans_config *config)
+{
+	int i;
+	double sum = 0.0;
+	for (i = 0; i < config->num_objs; i++)
+	{
+		/* Don't bother adding distances for objects in the NULL category */
+		if (config->objs[i] && config->clusters[i] != KMEANS_NULL_CLUSTER)
+			sum += (config->distance_method)(config->objs[i], config->centers[config->clusters[i]]);
+	}
+	return sum;
+}
+
+static void
+update_means(kmeans_config *config)
+{
+	int i;
+
+	for (i = 0; i < config->k; i++)
+	{
+		/* Update the centroid for this cluster */
+		(config->centroid_method)(config->objs, config->clusters, config->num_objs, i, config->centers[i]);
+	}
+}
+
 #ifdef KMEANS_THREADED
 
 static void * update_r_threaded_main(void *args)
@@ -145,36 +171,93 @@ static void update_r_threaded(kmeans_config *config)
 			}
 		}
 	}
-
-
 }
-#endif /* KMEANS_THREADED */
 
-static double
-J(kmeans_config *config)
+int update_means_k;
+pthread_mutex_t update_means_k_mutex;
+
+static void *
+update_means_threaded_main(void *arg)
 {
-	int i;
-	double sum = 0.0;
-	for (i = 0; i < config->num_objs; i++)
+	kmeans_config *config = (kmeans_config*)arg;
+	int i = 0;
+
+	do
 	{
-		/* Don't bother adding distances for objects in the NULL category */
-		if (config->objs[i] && config->clusters[i] != KMEANS_NULL_CLUSTER)
-			sum += (config->distance_method)(config->objs[i], config->centers[config->clusters[i]]);
+		pthread_mutex_lock (&update_means_k_mutex);
+		i = update_means_k;
+		update_means_k++;
+		pthread_mutex_unlock (&update_means_k_mutex);
+
+		if (i < config->k)
+			(config->centroid_method)(config->objs, config->clusters, config->num_objs, i, config->centers[i]);
 	}
-	return sum;
+	while (i < config->k);
+
+	pthread_exit(arg);
 }
 
 static void
-update_means(kmeans_config *config)
+update_means_threaded(kmeans_config *config)
 {
-	int i;
+	/* We only spin up threading infra if we need more than one core */
+	/* running. We keep the threshold high so the overhead of */
+	/* thread management is small compared to thread compute time */
+	int num_threads = config->num_objs / KMEANS_THR_THRESHOLD;
 
-	for (i = 0; i < config->k; i++)
+	/* Can't run more threads than the maximum */
+	num_threads = (num_threads > KMEANS_THR_MAX ? KMEANS_THR_MAX : num_threads);
+
+	/* If the problem size is small, don't bother w/ threading */
+	if (num_threads < 1)
 	{
-		/* Update the centroid for this cluster */
-		(config->centroid_method)(config->objs, config->clusters, config->num_objs, i, config->centers[i]);
+		update_means(config);
+	}
+	else
+	{
+		/* Mutex protected counter to drive threads */
+		pthread_t thread[KMEANS_THR_MAX];
+		pthread_attr_t thread_attr;
+		int i, rc;
+
+		pthread_mutex_init(&update_means_k_mutex, NULL);
+		update_means_k = 0;
+
+		pthread_attr_init(&thread_attr);
+		pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
+
+		/* Create threads to perform computation  */
+		for (i = 0; i < num_threads; i++)
+		{
+
+			/* Now we just run the thread, on its subset of the data */
+			rc = pthread_create(&thread[i], &thread_attr, update_means_threaded_main, (void *) config);
+			if (rc)
+			{
+				printf("ERROR: return code from pthread_create() is %d\n", rc);
+				exit(-1);
+			}
+		}
+
+		pthread_attr_destroy(&thread_attr);
+
+		/* Watch until completion  */
+		for (i = 0; i < num_threads; i++)
+		{
+		    void *status;
+			rc = pthread_join(thread[i], &status);
+			if (rc)
+			{
+				printf("ERROR: return code from pthread_join() is %d\n", rc);
+				exit(-1);
+			}
+		}
+
+		pthread_mutex_destroy(&update_means_k_mutex);
 	}
 }
+
+#endif /* KMEANS_THREADED */
 
 kmeans_result
 kmeans(kmeans_config *config)
@@ -208,20 +291,27 @@ kmeans(kmeans_config *config)
 
 #ifdef KMEANS_THREADED
 		update_r_threaded(config);
+		update_means_threaded(config);
 #else
 		update_r(config);
-#endif
 		update_means(config);
+#endif
 		new_target = J(config);
 		/*
 		 * if all the classification stay, diff must be 0.0,
 		 * which means we can go out!
 		 */
 		if (fabs(target - new_target) < DBL_EPSILON)
+		{
+			config->total_iterations = iterations;
 			return KMEANS_OK;
+		}
 
 		if (iterations++ > config->max_iterations)
+		{
+			config->total_iterations = iterations;
 			return KMEANS_EXCEEDED_MAX_ITERATIONS;
+		}
 
 		target = new_target;
 	}

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/time.h>
 
 #include "kmeans.h"
 
@@ -63,13 +64,15 @@ main(int nargs, char **args)
 	int spread = 3;
 	point *pts;
 	point *init;
+	int print_results = 0;
+	unsigned long start;
 
-	srandom(time(NULL));
+	srand(time(NULL));
 
 	/* Constants */
 	config.k = 10;
 	config.num_objs = config.k * nptsincluster;
-	config.max_iterations = 100;
+	config.max_iterations = 200;
 	config.distance_method = pt_distance;
 	config.centroid_method = pt_centroid;
 
@@ -102,29 +105,41 @@ main(int nargs, char **args)
 		}
 	}
 
-	/* Populate the initial means vector */
+	/* Populate the initial means vector with random start points */
 	for (i = 0; i < config.k; i++)
 	{
-		int r = lround(config.num_objs * (1.0 * random() / RAND_MAX));
+		int r = lround(config.num_objs * (1.0 * rand() / RAND_MAX));
 		/* Populate raw data */
 		init[i] = pts[r];
 		/* Pointers to raw data */
 		config.centers[i] = &(init[i]);
-		// printf("center[%d] %g %g\n", i, init[i].x, init[i].y);
+
+		if (print_results)
+			printf("center[%d]\t%g\t%g\n", i, init[i].x, init[i].y);
 	}
 
 	/* run k-means! */
+	start = time(NULL);
 	result = kmeans(&config);
 
-	/* print results */
-	for (i = 0; i < config.num_objs; i++)
-	{
-		point *pt = (point*)(config.objs[i]);
+	printf("\n");
+	printf("Iteration count: %d\n", config.total_iterations);
+	printf("     Time taken: %ld seconds\n", (time(NULL) - start));
+	printf(" Iterations/sec: %.3g\n", (1.0*config.total_iterations)/(time(NULL) - start));
+	printf("\n");
 
-		if (config.objs[i])
-			printf("%g\t%g\t%d\n", pt->x, pt->y, config.clusters[i]);
-		else
-			printf("N\tN\t%d\n", config.clusters[i]);
+	/* print results */
+	if (print_results)
+	{
+		for (i = 0; i < config.num_objs; i++)
+		{
+			point *pt = (point*)(config.objs[i]);
+
+			if (config.objs[i])
+				printf("%g\t%g\t%d\n", pt->x, pt->y, config.clusters[i]);
+			else
+				printf("N\tN\t%d\n", config.clusters[i]);
+		}
 	}
 
 	free(config.objs);
