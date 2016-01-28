@@ -60,17 +60,19 @@ main(int nargs, char **args)
 	kmeans_config config;
 	kmeans_result result;
 	int i, j;
-	int nptsincluster = 100000;
 	int spread = 3;
 	point *pts;
 	point *init;
 	int print_results = 0;
 	unsigned long start;
 
+	int nptsincluster = 10000;
+	int k = 10;
+
 	srand(time(NULL));
 
 	/* Constants */
-	config.k = 10;
+	config.k = k;
 	config.num_objs = config.k * nptsincluster;
 	config.max_iterations = 200;
 	config.distance_method = pt_distance;

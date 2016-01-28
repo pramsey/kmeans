@@ -68,20 +68,6 @@ update_r(kmeans_config *config)
 	}
 }
 
-static double
-J(kmeans_config *config)
-{
-	int i;
-	double sum = 0.0;
-	for (i = 0; i < config->num_objs; i++)
-	{
-		/* Don't bother adding distances for objects in the NULL category */
-		if (config->objs[i] && config->clusters[i] != KMEANS_NULL_CLUSTER)
-			sum += (config->distance_method)(config->objs[i], config->centers[config->clusters[i]]);
-	}
-	return sum;
-}
-
 static void
 update_means(kmeans_config *config)
 {
@@ -264,6 +250,8 @@ kmeans(kmeans_config *config)
 {
 	double	target, new_target;
 	int iterations = 0;
+	int *clusters_last;
+	size_t clusters_sz = sizeof(int)*config->num_objs;
 
 	assert(config);
 	assert(config->objs);
@@ -275,19 +263,22 @@ kmeans(kmeans_config *config)
 	assert(config->clusters);
 
 	/* Zero out cluster numbers, just in case user forgets */
-	memset(config->clusters, 0, sizeof(int)*config->num_objs);
+	memset(config->clusters, 0, clusters_sz);
 
 	/* Set default max iterations if necessary */
 	if (!config->max_iterations)
 		config->max_iterations = KMEANS_MAX_ITERATIONS;
 
 	/*
-	 * initialize purpose value. At this time, r doesn't mean anything
-	 * but it's ok; just fill target by some value.
+	 * Previous cluster state array. At this time, r doesn't mean anything
+	 * but it's ok
 	 */
-	target = J(config);
+	clusters_last = kmeans_malloc(clusters_sz);
+
 	while (1)
 	{
+		/* Store the previous state of the clustering */
+		memcpy(clusters_last, config->clusters, clusters_sz);
 
 #ifdef KMEANS_THREADED
 		update_r_threaded(config);
@@ -296,19 +287,20 @@ kmeans(kmeans_config *config)
 		update_r(config);
 		update_means(config);
 #endif
-		new_target = J(config);
 		/*
-		 * if all the classification stay, diff must be 0.0,
-		 * which means we can go out!
+		 * if all the cluster numbers are unchanged since last time,
+		 * we are at a stable solution, so we can stop here
 		 */
-		if (fabs(target - new_target) < DBL_EPSILON)
+		if (memcmp(clusters_last, config->clusters, clusters_sz) == 0)
 		{
+			kmeans_free(clusters_last);
 			config->total_iterations = iterations;
 			return KMEANS_OK;
 		}
 
 		if (iterations++ > config->max_iterations)
 		{
+			kmeans_free(clusters_last);
 			config->total_iterations = iterations;
 			return KMEANS_EXCEEDED_MAX_ITERATIONS;
 		}
@@ -316,6 +308,8 @@ kmeans(kmeans_config *config)
 		target = new_target;
 	}
 
+	kmeans_free(clusters_last);
+	config->total_iterations = iterations;
 	return KMEANS_ERROR;
 }
 

@@ -52,6 +52,8 @@
 #define KMEANS_THR_THRESHOLD 250000
 #endif
 
+#define kmeans_malloc(size) malloc(size)
+#define kmeans_free(ptr) free(ptr)
 
 typedef void * Pointer;
 
