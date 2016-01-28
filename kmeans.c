@@ -248,7 +248,6 @@ update_means_threaded(kmeans_config *config)
 kmeans_result
 kmeans(kmeans_config *config)
 {
-	double	target, new_target;
 	int iterations = 0;
 	int *clusters_last;
 	size_t clusters_sz = sizeof(int)*config->num_objs;
@@ -304,8 +303,6 @@ kmeans(kmeans_config *config)
 			config->total_iterations = iterations;
 			return KMEANS_EXCEEDED_MAX_ITERATIONS;
 		}
-
-		target = new_target;
 	}
 
 	kmeans_free(clusters_last);
