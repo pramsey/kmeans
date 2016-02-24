@@ -108,10 +108,10 @@ static void update_r_threaded(kmeans_config *config)
 	else
 	{
 		pthread_t thread[KMEANS_THR_MAX];
-	    pthread_attr_t thread_attr;
+		pthread_attr_t thread_attr;
 		kmeans_config thread_config[KMEANS_THR_MAX];
 		int obs_per_thread = config->num_objs / num_threads;
-	    int i, rc;
+		int i, rc;
 
 		for (i = 0; i < num_threads; i++)
 		{
@@ -129,9 +129,9 @@ static void update_r_threaded(kmeans_config *config)
 				thread_config[i].num_objs += config->num_objs - num_threads*obs_per_thread;
 			}
 
-		    /* Initialize and set thread detached attribute */
-		    pthread_attr_init(&thread_attr);
-		    pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
+			/* Initialize and set thread detached attribute */
+			pthread_attr_init(&thread_attr);
+			pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
 
 			/* Now we just run the thread, on its subset of the data */
 			rc = pthread_create(&thread[i], &thread_attr, update_r_threaded_main, (void *) &thread_config[i]);
@@ -142,8 +142,8 @@ static void update_r_threaded(kmeans_config *config)
 			}
 		}
 
-	    /* Free attribute and wait for the other threads */
-	    pthread_attr_destroy(&thread_attr);
+		/* Free attribute and wait for the other threads */
+		pthread_attr_destroy(&thread_attr);
 
 		/* Wait for all calculations to complete */
 		for (i = 0; i < num_threads; i++)
